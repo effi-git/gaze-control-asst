@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eye Tracking Assistive Technology</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i data-feather="eye"></i> Eye Tracking Assistant
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/calibration">Calibration</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/settings">Settings</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <span id="statusIndicator" class="badge rounded-pill bg-secondary me-2">
+                        <i data-feather="activity" class="me-1"></i> Offline
+                    </span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Camera Feed</h5>
+                        <div>
+                            <span id="fpsIndicator" class="badge bg-info me-2">0 FPS</span>
+                            <span id="faceIndicator" class="badge bg-secondary">No Face</span>
+                        </div>
+                    </div>
+                    <div class="card-body p-0 position-relative">
+                        <img id="videoFeed" src="{{ url_for('video_feed') }}" class="img-fluid w-100" alt="Camera Feed">
+                        <div id="overlay" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center text-white bg-dark bg-opacity-75">
+                            <i data-feather="video-off" style="width: 48px; height: 48px;"></i>
+                            <h3 class="mt-3">Eye Tracking Disabled</h3>
+                            <p class="text-center">Click the Start button to enable eye tracking.</p>
+                            <button id="startButton" class="btn btn-success btn-lg mt-3">
+                                <i data-feather="play"></i> Start Tracking
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">System Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Face Detected:</span>
+                                    <span id="faceStatus">No</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>EAR Value:</span>
+                                    <span id="earValue">0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Blink Detection:</span>
+                                    <span id="blinkStatus">None</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Frame Rate:</span>
+                                    <span id="frameRate">0 FPS</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Processing Time:</span>
+                                    <span id="processTime">0 ms</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Calibration:</span>
+                                    <span id="calibrationStatus">Not Calibrated</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between">
+                            <button id="stopButton" class="btn btn-danger" disabled>
+                                <i data-feather="stop-circle"></i> Stop
+                            </button>
+                            <a href="/calibration" class="btn btn-primary">
+                                <i data-feather="sliders"></i> Calibrate
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Instructions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading"><i data-feather="info"></i> How It Works</h6>
+                            <p>This system lets you control a keyboard with your eyes:</p>
+                            <ol>
+                                <li>Rows are scanned automatically</li>
+                                <li>Blink to select a row</li>
+                                <li>Keys in that row are scanned</li>
+                                <li>Blink again to select a key</li>
+                                <li>Word predictions help you type faster</li>
+                            </ol>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <h6 class="alert-heading"><i data-feather="alert-triangle"></i> Before Starting</h6>
+                            <p>For best results:</p>
+                            <ul>
+                                <li>Ensure good lighting on your face</li>
+                                <li>Position your face centered in the camera</li>
+                                <li>Complete the calibration process</li>
+                                <li>Minimize head movement while using</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Special Keys</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>Function</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>&lt;-</code></td>
+                                    <td>Delete last character</td>
+                                </tr>
+                                <tr>
+                                    <td><code>SPC</code></td>
+                                    <td>Add space</td>
+                                </tr>
+                                <tr>
+                                    <td><code>RST</code></td>
+                                    <td>Reset scan position</td>
+                                </tr>
+                                <tr>
+                                    <td><code>SRCH</code></td>
+                                    <td>Submit text (Enter)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>-&gt;</code></td>
+                                    <td>Use word predictions</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        // Initialize Feather icons
+        document.addEventListener('DOMContentLoaded', function() {
+            feather.replace();
+            
+            // Add event listeners for buttons
+            document.getElementById('startButton').addEventListener('click', startTracking);
+            document.getElementById('stopButton').addEventListener('click', stopTracking);
+            
+            // Start status updates
+            setInterval(updateStatus, 1000);
+        });
+        
+        function startTracking() {
+            fetch('/api/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'started') {
+                    document.getElementById('overlay').style.display = 'none';
+                    document.getElementById('startButton').disabled = true;
+                    document.getElementById('stopButton').disabled = false;
+                    document.getElementById('statusIndicator').className = 'badge rounded-pill bg-success me-2';
+                    document.getElementById('statusIndicator').innerHTML = '<i data-feather="activity" class="me-1"></i> Online';
+                    feather.replace();
+                }
+            })
+            .catch(error => {
+                console.error('Error starting tracking:', error);
+                alert('Failed to start eye tracking system.');
+            });
+        }
+        
+        function stopTracking() {
+            fetch('/api/stop', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'stopped') {
+                    document.getElementById('overlay').style.display = 'flex';
+                    document.getElementById('startButton').disabled = false;
+                    document.getElementById('stopButton').disabled = true;
+                    document.getElementById('statusIndicator').className = 'badge rounded-pill bg-secondary me-2';
+                    document.getElementById('statusIndicator').innerHTML = '<i data-feather="activity" class="me-1"></i> Offline';
+                    feather.replace();
+                }
+            })
+            .catch(error => {
+                console.error('Error stopping tracking:', error);
+                alert('Failed to stop eye tracking system.');
+            });
+        }
+        
+        function updateStatus() {
+            fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                // Update face detection status
+                document.getElementById('faceStatus').textContent = data.face_detected ? 'Yes' : 'No';
+                document.getElementById('faceIndicator').textContent = data.face_detected ? 'Face Detected' : 'No Face';
+                document.getElementById('faceIndicator').className = data.face_detected ? 'badge bg-success' : 'badge bg-secondary';
+                
+                // Update EAR value
+                document.getElementById('earValue').textContent = data.ear_value.toFixed(2);
+                
+                // Update blink status
+                document.getElementById('blinkStatus').textContent = data.blink_detected ? 'Detected' : 'None';
+                document.getElementById('blinkStatus').className = data.blink_detected ? 'text-success' : '';
+                
+                // Update performance metrics
+                if (data.performance) {
+                    if (data.performance.fps) {
+                        document.getElementById('frameRate').textContent = data.performance.fps.toFixed(1) + ' FPS';
+                        document.getElementById('fpsIndicator').textContent = data.performance.fps.toFixed(1) + ' FPS';
+                    }
+                    
+                    if (data.performance.avg_process_time) {
+                        document.getElementById('processTime').textContent = data.performance.avg_process_time.toFixed(1) + ' ms';
+                    }
+                }
+                
+                // Get calibration status
+                fetch('/api/calibration/status')
+                .then(response => response.json())
+                .then(calibData => {
+                    if (calibData.status === 'calibrated') {
+                        document.getElementById('calibrationStatus').textContent = 'Calibrated';
+                        document.getElementById('calibrationStatus').className = 'text-success';
+                    } else if (calibData.status === 'in_progress') {
+                        document.getElementById('calibrationStatus').textContent = 'In Progress';
+                        document.getElementById('calibrationStatus').className = 'text-warning';
+                    } else {
+                        document.getElementById('calibrationStatus').textContent = 'Not Calibrated';
+                        document.getElementById('calibrationStatus').className = '';
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching status:', error);
+            });
+        }
+    </script>
+</body>
+</html>

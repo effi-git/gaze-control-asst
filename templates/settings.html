@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Eye Tracking Assistive Technology</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i data-feather="eye"></i> Eye Tracking Assistant
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/calibration">Calibration</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/settings">Settings</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <span id="statusIndicator" class="badge rounded-pill bg-secondary me-2">
+                        <i data-feather="activity" class="me-1"></i> Offline
+                    </span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">System Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="settingsForm">
+                            <div class="mb-4">
+                                <h6 class="border-bottom pb-2 mb-3">Blink Detection Settings</h6>
+                                
+                                <div class="mb-3">
+                                    <label for="earThreshold" class="form-label d-flex justify-content-between">
+                                        <span>EAR Threshold</span>
+                                        <small class="text-muted" id="earThresholdValue">0.20</small>
+                                    </label>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">0.10</span>
+                                        <input type="range" class="form-range flex-grow-1" id="earThreshold" min="0.10" max="0.40" step="0.01" value="0.20">
+                                        <span class="ms-2">0.40</span>
+                                    </div>
+                                    <div class="form-text">Lower values make blink detection more sensitive (may cause false positives)</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="confidenceThreshold" class="form-label d-flex justify-content-between">
+                                        <span>LSTM Confidence Threshold</span>
+                                        <small class="text-muted" id="confidenceThresholdValue">0.70</small>
+                                    </label>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">0.50</span>
+                                        <input type="range" class="form-range flex-grow-1" id="confidenceThreshold" min="0.50" max="0.95" step="0.05" value="0.70">
+                                        <span class="ms-2">0.95</span>
+                                    </div>
+                                    <div class="form-text">Minimum confidence needed for the LSTM model to detect a blink</div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <h6 class="border-bottom pb-2 mb-3">Keyboard UI Settings</h6>
+                                
+                                <div class="mb-3">
+                                    <label for="traversalInterval" class="form-label d-flex justify-content-between">
+                                        <span>Traversal Interval (seconds)</span>
+                                        <small class="text-muted" id="traversalIntervalValue">0.60</small>
+                                    </label>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">0.30</span>
+                                        <input type="range" class="form-range flex-grow-1" id="traversalInterval" min="0.30" max="2.00" step="0.05" value="0.60">
+                                        <span class="ms-2">2.00</span>
+                                    </div>
+                                    <div class="form-text">Time between row/key transitions (higher values allow more time to make selections)</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="postBlinkPause" class="form-label d-flex justify-content-between">
+                                        <span>Post-Blink Pause (seconds)</span>
+                                        <small class="text-muted" id="postBlinkPauseValue">0.50</small>
+                                    </label>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">0.20</span>
+                                        <input type="range" class="form-range flex-grow-1" id="postBlinkPause" min="0.20" max="1.00" step="0.05" value="0.50">
+                                        <span class="ms-2">1.00</span>
+                                    </div>
+                                    <div class="form-text">Pause duration after a blink is detected</div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <h6 class="border-bottom pb-2 mb-3">Text Prediction Settings</h6>
+                                
+                                <div class="mb-3">
+                                    <label for="maxSuggestions" class="form-label d-flex justify-content-between">
+                                        <span>Maximum Suggestions</span>
+                                        <small class="text-muted" id="maxSuggestionsValue">5</small>
+                                    </label>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">1</span>
+                                        <input type="range" class="form-range flex-grow-1" id="maxSuggestions" min="1" max="10" step="1" value="5">
+                                        <span class="ms-2">10</span>
+                                    </div>
+                                    <div class="form-text">Maximum number of word suggestions to display</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="userHistoryWeight" class="form-label d-flex justify-content-between">
+                                        <span>User History Weight</span>
+                                        <small class="text-muted" id="userHistoryWeightValue">2.0</small>
+                                    </label>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">1.0</span>
+                                        <input type="range" class="form-range flex-grow-1" id="userHistoryWeight" min="1.0" max="5.0" step="0.5" value="2.0">
+                                        <span class="ms-2">5.0</span>
+                                    </div>
+                                    <div class="form-text">Weight given to user's own typing history when predicting words</div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between">
+                                <button type="button" id="resetDefaultsButton" class="btn btn-outline-secondary">
+                                    <i data-feather="refresh-cw"></i> Reset to Defaults
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i data-feather="save"></i> Save Settings
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">System Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Status:</span>
+                            <span id="systemStatus">Offline</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Calibration:</span>
+                            <span id="calibrationStatus">Not Calibrated</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Frame Rate:</span>
+                            <span id="frameRate">0 FPS</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Process Time:</span>
+                            <span id="processTime">0 ms</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Current EAR:</span>
+                            <span id="currentEar">0.00</span>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="d-grid gap-2">
+                            <a href="/calibration" class="btn btn-outline-primary">
+                                <i data-feather="sliders"></i> Calibration
+                            </a>
+                            <a id="startStopButton" href="#" class="btn btn-success">
+                                <i data-feather="play"></i> Start System
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Settings Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <h6 class="alert-heading"><i data-feather="info"></i> Tips for Settings</h6>
+                            <ul class="mb-0">
+                                <li>Increase traversal interval if selections are too fast</li>
+                                <li>Adjust EAR threshold after calibration only if needed</li>
+                                <li>Higher confidence threshold reduces false blinks</li>
+                                <li>More word suggestions may be useful for faster typing</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <h6 class="alert-heading"><i data-feather="alert-triangle"></i> Important</h6>
+                            <p class="mb-0">Run the calibration process again if you change lighting conditions or camera position.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script>
+        // Initialize Feather icons
+        document.addEventListener('DOMContentLoaded', function() {
+            feather.replace();
+            
+            // Add event listeners for settings form
+            document.getElementById('settingsForm').addEventListener('submit', saveSettings);
+            document.getElementById('resetDefaultsButton').addEventListener('click', resetDefaults);
+            document.getElementById('startStopButton').addEventListener('click', toggleSystem);
+            
+            // Add event listeners for range sliders to update their displayed values
+            setupRangeListener('earThreshold', 'earThresholdValue');
+            setupRangeListener('confidenceThreshold', 'confidenceThresholdValue');
+            setupRangeListener('traversalInterval', 'traversalIntervalValue');
+            setupRangeListener('postBlinkPause', 'postBlinkPauseValue');
+            setupRangeListener('maxSuggestions', 'maxSuggestionsValue');
+            setupRangeListener('userHistoryWeight', 'userHistoryWeightValue');
+            
+            // Load current settings
+            loadSettings();
+            
+            // Start status updates
+            setInterval(updateStatus, 1000);
+        });
+        
+        function setupRangeListener(inputId, valueId) {
+            const input = document.getElementById(inputId);
+            const valueDisplay = document.getElementById(valueId);
+            
+            input.addEventListener('input', function() {
+                valueDisplay.textContent = this.value;
+            });
+        }
+        
+        function loadSettings() {
+            fetch('/api/settings')
+            .then(response => response.json())
+            .then(data => {
+                // Update form with current settings
+                if (data.ear_threshold) {
+                    document.getElementById('earThreshold').value = data.ear_threshold;
+                    document.getElementById('earThresholdValue').textContent = data.ear_threshold.toFixed(2);
+                }
+                
+                if (data.confidence_threshold) {
+                    document.getElementById('confidenceThreshold').value = data.confidence_threshold;
+                    document.getElementById('confidenceThresholdValue').textContent = data.confidence_threshold.toFixed(2);
+                }
+                
+                if (data.traversal_interval) {
+                    document.getElementById('traversalInterval').value = data.traversal_interval;
+                    document.getElementById('traversalIntervalValue').textContent = data.traversal_interval.toFixed(2);
+                }
+                
+                if (data.post_blink_pause) {
+                    document.getElementById('postBlinkPause').value = data.post_blink_pause;
+                    document.getElementById('postBlinkPauseValue').textContent = data.post_blink_pause.toFixed(2);
+                }
+                
+                if (data.max_suggestions) {
+                    document.getElementById('maxSuggestions').value = data.max_suggestions;
+                    document.getElementById('maxSuggestionsValue').textContent = data.max_suggestions;
+                }
+                
+                if (data.user_history_weight) {
+                    document.getElementById('userHistoryWeight').value = data.user_history_weight;
+                    document.getElementById('userHistoryWeightValue').textContent = data.user_history_weight.toFixed(1);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading settings:', error);
+            });
+        }
+        
+        function saveSettings(event) {
+            event.preventDefault();
+            
+            const settings = {
+                ear_threshold: parseFloat(document.getElementById('earThreshold').value),
+                confidence_threshold: parseFloat(document.getElementById('confidenceThreshold').value),
+                traversal_interval: parseFloat(document.getElementById('traversalInterval').value),
+                post_blink_pause: parseFloat(document.getElementById('postBlinkPause').value),
+                max_suggestions: parseInt(document.getElementById('maxSuggestions').value),
+                user_history_weight: parseFloat(document.getElementById('userHistoryWeight').value)
+            };
+            
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Show success message
+                    const alertHTML = `
+                        <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                            Settings saved successfully!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    document.getElementById('settingsForm').insertAdjacentHTML('afterend', alertHTML);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving settings:', error);
+                // Show error message
+                const alertHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                        Error saving settings: ${error}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                document.getElementById('settingsForm').insertAdjacentHTML('afterend', alertHTML);
+            });
+        }
+        
+        function resetDefaults() {
+            // Set default values
+            document.getElementById('earThreshold').value = 0.20;
+            document.getElementById('earThresholdValue').textContent = '0.20';
+            
+            document.getElementById('confidenceThreshold').value = 0.70;
+            document.getElementById('confidenceThresholdValue').textContent = '0.70';
+            
+            document.getElementById('traversalInterval').value = 0.60;
+            document.getElementById('traversalIntervalValue').textContent = '0.60';
+            
+            document.getElementById('postBlinkPause').value = 0.50;
+            document.getElementById('postBlinkPauseValue').textContent = '0.50';
+            
+            document.getElementById('maxSuggestions').value = 5;
+            document.getElementById('maxSuggestionsValue').textContent = '5';
+            
+            document.getElementById('userHistoryWeight').value = 2.0;
+            document.getElementById('userHistoryWeightValue').textContent = '2.0';
+            
+            // Show reset message
+            const alertHTML = `
+                <div class="alert alert-info alert-dismissible fade show mt-3" role="alert">
+                    Settings reset to defaults. Click Save to apply changes.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            document.getElementById('settingsForm').insertAdjacentHTML('afterend', alertHTML);
+        }
+        
+        function toggleSystem(event) {
+            event.preventDefault();
+            
+            const button = document.getElementById('startStopButton');
+            const isRunning = button.classList.contains('btn-danger');
+            
+            if (isRunning) {
+                // Stop the system
+                fetch('/api/stop', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'stopped') {
+                        button.innerHTML = '<i data-feather="play"></i> Start System';
+                        button.classList.remove('btn-danger');
+                        button.classList.add('btn-success');
+                        feather.replace();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error stopping system:', error);
+                });
+            } else {
+                // Start the system
+                fetch('/api/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'started') {
+                        button.innerHTML = '<i data-feather="stop-circle"></i> Stop System';
+                        button.classList.remove('btn-success');
+                        button.classList.add('btn-danger');
+                        feather.replace();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error starting system:', error);
+                });
+            }
+        }
+        
+        function updateStatus() {
+            fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                // Update system status
+                const systemStatusElement = document.getElementById('systemStatus');
+                systemStatusElement.textContent = data.running ? 'Online' : 'Offline';
+                systemStatusElement.className = data.running ? 'text-success' : 'text-secondary';
+                
+                // Update start/stop button
+                const button = document.getElementById('startStopButton');
+                if (data.running) {
+                    button.innerHTML = '<i data-feather="stop-circle"></i> Stop System';
+                    button.classList.remove('btn-success');
+                    button.classList.add('btn-danger');
+                } else {
+                    button.innerHTML = '<i data-feather="play"></i> Start System';
+                    button.classList.remove('btn-danger');
+                    button.classList.add('btn-success');
+                }
+                feather.replace();
+                
+                // Update status indicator
+                document.getElementById('statusIndicator').className = data.running ? 'badge rounded-pill bg-success me-2' : 'badge rounded-pill bg-secondary me-2';
+                document.getElementById('statusIndicator').innerHTML = data.running ? '<i data-feather="activity" class="me-1"></i> Online' : '<i data-feather="activity" class="me-1"></i> Offline';
+                feather.replace();
+                
+                // Update performance metrics
+                if (data.performance) {
+                    if (data.performance.fps) {
+                        document.getElementById('frameRate').textContent = data.performance.fps.toFixed(1) + ' FPS';
+                    }
+                    
+                    if (data.performance.avg_process_time) {
+                        document.getElementById('processTime').textContent = data.performance.avg_process_time.toFixed(1) + ' ms';
+                    }
+                }
+                
+                // Update EAR value
+                document.getElementById('currentEar').textContent = data.ear_value.toFixed(3);
+                
+                // Check calibration status
+                fetch('/api/calibration/status')
+                .then(response => response.json())
+                .then(calibData => {
+                    if (calibData.status === 'calibrated') {
+                        document.getElementById('calibrationStatus').textContent = 'Calibrated';
+                        document.getElementById('calibrationStatus').className = 'text-success';
+                    } else if (calibData.status === 'in_progress') {
+                        document.getElementById('calibrationStatus').textContent = 'In Progress';
+                        document.getElementById('calibrationStatus').className = 'text-warning';
+                    } else {
+                        document.getElementById('calibrationStatus').textContent = 'Not Calibrated';
+                        document.getElementById('calibrationStatus').className = 'text-danger';
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error fetching status:', error);
+            });
+        }
+    </script>
+</body>
+</html>
