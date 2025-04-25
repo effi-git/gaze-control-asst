@@ -158,17 +158,24 @@ def settings():
     """Render the settings interface."""
     return render_template('settings.html')
 
+@app.route('/test')
+def test_page():
+    """Render the API test page."""
+    return render_template('test_api.html')
+
 @app.route('/api/start', methods=['POST'])
 def api_start():
     """API endpoint to start the eye tracking system."""
     start_tracking()
-    return {"status": "started"}
+    from flask import jsonify
+    return jsonify({"status": "started"})
 
 @app.route('/api/stop', methods=['POST'])
 def api_stop():
     """API endpoint to stop the eye tracking system."""
     stop_tracking()
-    return {"status": "stopped"}
+    from flask import jsonify
+    return jsonify({"status": "stopped"})
 
 # Import web interface routes after defining app
 import web_interface

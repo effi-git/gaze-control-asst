@@ -16,6 +16,10 @@ from flask import request, jsonify, Response, render_template, session
 import main 
 app = main.app  # Use the app from main.py
 
+# Initialize the running flag if it doesn't exist
+if not hasattr(main, 'running'):
+    main.running = False
+
 # Import the IS_WEB_ENV variable to use consistently across all files
 try:
     from eye_tracker import IS_WEB_ENV
@@ -348,6 +352,8 @@ def handle_settings():
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
+
+# Note: API start and stop endpoints are defined in main.py
 
 @app.errorhandler(500)
 def server_error(e):

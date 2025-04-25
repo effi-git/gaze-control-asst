@@ -85,7 +85,7 @@ selection_sound = None # Initialize new sound variable
 
 # --- Load Key Action Sound ---
 try:
-    action_sound_path = "C:\\Users\\Afiya Khadir\\Downloads\\action.wav" # !!! REPLACE FOR KEY SELECTION SOUND !!!
+    action_sound_path = "static/sounds/action.wav"  # Using relative path in our project
     print(f"Loading ACTION sound from: {action_sound_path}")
     action_sound = pygame.mixer.Sound(action_sound_path)
 except Exception as e: print(f"Error loading ACTION sound: {e}. No action sound feedback."); action_sound = None
@@ -93,7 +93,7 @@ except Exception as e: print(f"Error loading ACTION sound: {e}. No action sound 
 # --- Load Row Selection Sound ---
 try:
     # !!! IMPORTANT: SET PATH TO YOUR ROW SELECTION SOUND FILE !!!
-    selection_sound_path = "C:\\Users\\Afiya Khadir\\Downloads\\mixkit-correct-answer-tone-2870.wav" # !!! REPLACE FOR ROW SELECTION SOUND !!!
+    selection_sound_path = "static/sounds/selection.wav" # !!! REPLACE FOR ROW SELECTION SOUND !!!
     print(f"Loading SELECTION sound from: {selection_sound_path}")
     selection_sound = pygame.mixer.Sound(selection_sound_path)
 except Exception as e: print(f"Error loading SELECTION sound: {e}. No selection sound feedback."); selection_sound = None

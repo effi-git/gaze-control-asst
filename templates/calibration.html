@@ -207,41 +207,64 @@
         });
         
         function startCalibration() {
-            // First ensure tracking is started
+            // First ensure tracking is started with better error handling
             fetch('/api/start', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                }
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 // Now start calibration
-                fetch('/api/calibration/start', {
+                return fetch('/api/calibration/start', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'started') {
-                        document.getElementById('overlay').style.display = 'none';
-                        document.getElementById('calibrationProgress').style.display = 'flex';
-                        document.getElementById('calibrationComplete').style.display = 'none';
-                        document.getElementById('statusIndicator').className = 'badge rounded-pill bg-warning me-2';
-                        document.getElementById('statusIndicator').innerHTML = '<i data-feather="activity" class="me-1"></i> Calibrating';
-                        feather.replace();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error starting calibration:', error);
-                    alert('Failed to start calibration process.');
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
                 });
             })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'started') {
+                    document.getElementById('overlay').style.display = 'none';
+                    document.getElementById('calibrationProgress').style.display = 'flex';
+                    document.getElementById('calibrationComplete').style.display = 'none';
+                    document.getElementById('statusIndicator').className = 'badge rounded-pill bg-warning me-2';
+                    document.getElementById('statusIndicator').innerHTML = '<i data-feather="activity" class="me-1"></i> Calibrating';
+                    feather.replace();
+                } else if (data.status === 'web_simulation') {
+                    // Handle web simulation mode
+                    document.getElementById('overlay').style.display = 'flex';
+                    document.getElementById('overlay').querySelector('.card-title').textContent = 'Web Simulation';
+                    document.getElementById('overlay').querySelector('.card-text').innerHTML = 'This is a simulation only. On a desktop system with a camera, you would see real-time calibration.';
+                    document.getElementById('calibrationProgress').style.display = 'none';
+                    document.getElementById('calibrationComplete').style.display = 'none';
+                }
+            })
             .catch(error => {
-                console.error('Error starting tracking:', error);
-                alert('Failed to start tracking system.');
+                console.error('Error starting calibration:', error);
+                // Show error in UI instead of just an alert
+                document.getElementById('overlay').style.display = 'flex';
+                document.getElementById('overlay').querySelector('.card-title').textContent = 'Error Starting Calibration';
+                document.getElementById('overlay').querySelector('.card-text').innerHTML = 'Failed to start calibration process. Please try again.';
+                document.getElementById('statusIndicator').className = 'badge rounded-pill bg-danger me-2';
+                document.getElementById('statusIndicator').innerHTML = '<i data-feather="alert-triangle" class="me-1"></i> Error';
+                feather.replace();
             });
         }
         
@@ -249,10 +272,17 @@
             fetch('/api/calibration/cancel', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                }
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.status === 'cancelled') {
                     document.getElementById('overlay').style.display = 'flex';
@@ -264,29 +294,53 @@
             })
             .catch(error => {
                 console.error('Error cancelling calibration:', error);
-                alert('Failed to cancel calibration process.');
+                // Show error in UI instead of just an alert
+                document.getElementById('statusIndicator').className = 'badge rounded-pill bg-warning me-2';
+                document.getElementById('statusIndicator').innerHTML = '<i data-feather="alert-triangle" class="me-1"></i> Error';
+                feather.replace();
             });
         }
         
         function checkCalibrationStatus() {
-            fetch('/api/calibration/status')
-            .then(response => response.json())
+            fetch('/api/calibration/status', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.status === 'calibrated') {
-                    // Show calibration data
-                    document.getElementById('earThreshold').textContent = data.threshold.toFixed(3);
-                    
-                    if (data.mean_ear) {
-                        document.getElementById('meanEar').textContent = data.mean_ear.toFixed(3);
+                    // Show calibration data with safety checks
+                    if (data.threshold !== undefined && data.threshold !== null) {
+                        document.getElementById('earThreshold').textContent = data.threshold.toFixed(3);
+                    } else {
+                        document.getElementById('earThreshold').textContent = 'N/A';
                     }
                     
-                    if (data.min_ear) {
+                    if (data.mean_ear !== undefined && data.mean_ear !== null) {
+                        document.getElementById('meanEar').textContent = data.mean_ear.toFixed(3);
+                    } else {
+                        document.getElementById('meanEar').textContent = 'N/A';
+                    }
+                    
+                    if (data.min_ear !== undefined && data.min_ear !== null) {
                         document.getElementById('minEar').textContent = data.min_ear.toFixed(3);
+                    } else {
+                        document.getElementById('minEar').textContent = 'N/A';
                     }
                     
                     if (data.calibration_time) {
                         const date = new Date(data.calibration_time * 1000);
                         document.getElementById('lastCalibration').textContent = date.toLocaleString();
+                    } else {
+                        document.getElementById('lastCalibration').textContent = 'N/A';
                     }
                     
                     // Show calibration complete
@@ -299,6 +353,13 @@
                     document.getElementById('overlay').style.display = 'none';
                     document.getElementById('calibrationProgress').style.display = 'flex';
                     document.getElementById('calibrationComplete').style.display = 'none';
+                } else if (data.status === 'web_simulation') {
+                    // Web simulation mode
+                    document.getElementById('overlay').style.display = 'flex';
+                    document.getElementById('overlay').querySelector('.card-title').textContent = 'Web Simulation';
+                    document.getElementById('overlay').querySelector('.card-text').innerHTML = 'This is a simulation only. On a desktop system with a camera, you would see real-time calibration.';
+                    document.getElementById('calibrationProgress').style.display = 'none';
+                    document.getElementById('calibrationComplete').style.display = 'none';
                 } else {
                     // Not calibrated
                     document.getElementById('overlay').style.display = 'flex';
@@ -308,12 +369,29 @@
             })
             .catch(error => {
                 console.error('Error checking calibration status:', error);
+                // Set reasonable defaults
+                document.getElementById('overlay').style.display = 'flex';
+                document.getElementById('overlay').querySelector('.card-title').textContent = 'Connection Error';
+                document.getElementById('overlay').querySelector('.card-text').innerHTML = 'Could not connect to the calibration service. Please try refreshing the page.';
+                document.getElementById('calibrationProgress').style.display = 'none';
+                document.getElementById('calibrationComplete').style.display = 'none';
             });
         }
         
         function checkCalibrationProgress() {
-            fetch('/api/calibration/status')
-            .then(response => response.json())
+            fetch('/api/calibration/status', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.status === 'in_progress') {
                     updateCalibrationProgress(data);
@@ -327,20 +405,47 @@
             })
             .catch(error => {
                 console.error('Error checking calibration progress:', error);
+                // Don't change UI state on error to avoid flickering
             });
         }
         
         function updateCalibrationProgress(data) {
-            document.getElementById('calibrationInstruction').textContent = data.instruction;
-            document.getElementById('calibrationProgressBar').style.width = data.progress + '%';
-            document.getElementById('currentStep').textContent = data.step;
-            document.getElementById('totalSteps').textContent = data.total_steps;
-            document.getElementById('remainingTime').textContent = data.remaining;
+            // Add safety checks for all data fields
+            if (data.instruction) {
+                document.getElementById('calibrationInstruction').textContent = data.instruction;
+            }
+            
+            if (data.progress !== undefined && data.progress !== null) {
+                document.getElementById('calibrationProgressBar').style.width = data.progress + '%';
+            }
+            
+            if (data.step !== undefined && data.step !== null) {
+                document.getElementById('currentStep').textContent = data.step;
+            }
+            
+            if (data.total_steps !== undefined && data.total_steps !== null) {
+                document.getElementById('totalSteps').textContent = data.total_steps;
+            }
+            
+            if (data.remaining !== undefined && data.remaining !== null) {
+                document.getElementById('remainingTime').textContent = data.remaining;
+            }
         }
         
         function updateStatus() {
-            fetch('/api/status')
-            .then(response => response.json())
+            fetch('/api/status', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 // Update face detection status
                 document.getElementById('faceIndicator').textContent = data.face_detected ? 'Face Detected' : 'No Face';
@@ -355,6 +460,15 @@
             })
             .catch(error => {
                 console.error('Error fetching status:', error);
+                // Update UI to show error state
+                document.getElementById('faceIndicator').textContent = 'Status Unknown';
+                document.getElementById('faceIndicator').className = 'badge bg-warning';
+                
+                if (document.getElementById('calibrationProgress').style.display !== 'flex') {
+                    document.getElementById('statusIndicator').className = 'badge rounded-pill bg-warning me-2';
+                    document.getElementById('statusIndicator').innerHTML = '<i data-feather="alert-triangle" class="me-1"></i> Error';
+                    feather.replace();
+                }
             });
         }
     </script>

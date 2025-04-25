@@ -202,10 +202,17 @@
             fetch('/api/start', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                }
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.status === 'started') {
                     document.getElementById('overlay').style.display = 'none';
@@ -214,11 +221,23 @@
                     document.getElementById('statusIndicator').className = 'badge rounded-pill bg-success me-2';
                     document.getElementById('statusIndicator').innerHTML = '<i data-feather="activity" class="me-1"></i> Online';
                     feather.replace();
+                    
+                    // Force an immediate status update
+                    updateStatus();
                 }
             })
             .catch(error => {
                 console.error('Error starting tracking:', error);
-                alert('Failed to start eye tracking system.');
+                
+                // Show error but with more information
+                document.getElementById('statusIndicator').className = 'badge rounded-pill bg-danger me-2';
+                document.getElementById('statusIndicator').innerHTML = '<i data-feather="alert-triangle" class="me-1"></i> Error';
+                feather.replace();
+                
+                // Only show an alert for severe errors
+                if (error.message.includes('Failed to fetch')) {
+                    alert('Failed to start eye tracking system: Server unreachable');
+                }
             });
         }
         
@@ -226,10 +245,17 @@
             fetch('/api/stop', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                }
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.status === 'stopped') {
                     document.getElementById('overlay').style.display = 'flex';
@@ -238,60 +264,118 @@
                     document.getElementById('statusIndicator').className = 'badge rounded-pill bg-secondary me-2';
                     document.getElementById('statusIndicator').innerHTML = '<i data-feather="activity" class="me-1"></i> Offline';
                     feather.replace();
+                    
+                    // Force an immediate status update
+                    updateStatus();
                 }
             })
             .catch(error => {
                 console.error('Error stopping tracking:', error);
-                alert('Failed to stop eye tracking system.');
+                
+                // Show error in UI
+                document.getElementById('statusIndicator').className = 'badge rounded-pill bg-warning me-2';
+                document.getElementById('statusIndicator').innerHTML = '<i data-feather="alert-triangle" class="me-1"></i> Error';
+                feather.replace();
+                
+                // Only show an alert for severe errors
+                if (error.message.includes('Failed to fetch')) {
+                    alert('Failed to stop eye tracking system: Server unreachable');
+                }
             });
         }
         
         function updateStatus() {
-            fetch('/api/status')
-            .then(response => response.json())
+            // Use a more robust fetch with proper error handling
+            fetch('/api/status', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 // Update face detection status
                 document.getElementById('faceStatus').textContent = data.face_detected ? 'Yes' : 'No';
                 document.getElementById('faceIndicator').textContent = data.face_detected ? 'Face Detected' : 'No Face';
                 document.getElementById('faceIndicator').className = data.face_detected ? 'badge bg-success' : 'badge bg-secondary';
                 
-                // Update EAR value
-                document.getElementById('earValue').textContent = data.ear_value.toFixed(2);
+                // Update EAR value with safety check
+                if (data.ear_value !== undefined && data.ear_value !== null) {
+                    document.getElementById('earValue').textContent = data.ear_value.toFixed(2);
+                } else {
+                    document.getElementById('earValue').textContent = 'N/A';
+                }
                 
                 // Update blink status
                 document.getElementById('blinkStatus').textContent = data.blink_detected ? 'Detected' : 'None';
                 document.getElementById('blinkStatus').className = data.blink_detected ? 'text-success' : '';
                 
-                // Update performance metrics
+                // Update performance metrics with safety checks
                 if (data.performance) {
-                    if (data.performance.fps) {
+                    if (data.performance.fps !== undefined && data.performance.fps !== null) {
                         document.getElementById('frameRate').textContent = data.performance.fps.toFixed(1) + ' FPS';
                         document.getElementById('fpsIndicator').textContent = data.performance.fps.toFixed(1) + ' FPS';
                     }
                     
-                    if (data.performance.avg_process_time) {
+                    if (data.performance.avg_process_time !== undefined && data.performance.avg_process_time !== null) {
                         document.getElementById('processTime').textContent = data.performance.avg_process_time.toFixed(1) + ' ms';
                     }
                 }
                 
-                // Get calibration status
-                fetch('/api/calibration/status')
-                .then(response => response.json())
-                .then(calibData => {
-                    if (calibData.status === 'calibrated') {
-                        document.getElementById('calibrationStatus').textContent = 'Calibrated';
-                        document.getElementById('calibrationStatus').className = 'text-success';
-                    } else if (calibData.status === 'in_progress') {
-                        document.getElementById('calibrationStatus').textContent = 'In Progress';
-                        document.getElementById('calibrationStatus').className = 'text-warning';
-                    } else {
-                        document.getElementById('calibrationStatus').textContent = 'Not Calibrated';
-                        document.getElementById('calibrationStatus').className = '';
-                    }
-                });
+                // Fetch calibration status separately with proper error handling
+                updateCalibrationStatus();
             })
             .catch(error => {
-                console.error('Error fetching status:', error);
+                console.error('Error checking status:', error);
+                // Don't show alerts to avoid disrupting the user experience
+                // Set reasonable defaults for UI
+                document.getElementById('faceStatus').textContent = 'Unknown';
+                document.getElementById('faceIndicator').textContent = 'Status Unknown';
+                document.getElementById('faceIndicator').className = 'badge bg-warning';
+                document.getElementById('earValue').textContent = 'N/A';
+                document.getElementById('blinkStatus').textContent = 'Unknown';
+            });
+        }
+        
+        function updateCalibrationStatus() {
+            fetch('/api/calibration/status', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(calibData => {
+                if (calibData.status === 'calibrated') {
+                    document.getElementById('calibrationStatus').textContent = 'Calibrated';
+                    document.getElementById('calibrationStatus').className = 'text-success';
+                } else if (calibData.status === 'in_progress') {
+                    document.getElementById('calibrationStatus').textContent = 'In Progress';
+                    document.getElementById('calibrationStatus').className = 'text-warning';
+                } else if (calibData.status === 'web_simulation') {
+                    document.getElementById('calibrationStatus').textContent = 'Web Simulation';
+                    document.getElementById('calibrationStatus').className = 'text-info';
+                } else {
+                    document.getElementById('calibrationStatus').textContent = 'Not Calibrated';
+                    document.getElementById('calibrationStatus').className = '';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking calibration status:', error);
+                document.getElementById('calibrationStatus').textContent = 'Unknown';
+                document.getElementById('calibrationStatus').className = 'text-muted';
             });
         }
     </script>
