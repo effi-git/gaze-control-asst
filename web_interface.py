@@ -12,7 +12,14 @@ import cv2
 import numpy as np
 from flask import request, jsonify, Response, render_template, session
 
-from main import app, start_tracking, stop_tracking, eye_tracker, calibration_manager, blink_detector
+# Import Flask app without creating a circular import
+import main 
+app = main.app  # Use the app from main.py
+
+# These will be accessed directly from main when needed, avoiding the circular import
+# eye_tracker = None
+# calibration_manager = None
+# blink_detector = None
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +39,7 @@ def update_latest_frame(frame):
 @app.route('/api/calibration/start', methods=['POST'])
 def start_calibration():
     """Start the calibration process."""
-    if not calibration_manager:
+    if not hasattr(main, 'calibration_manager') or main.calibration_manager is None:
         # Return simulated response for web environment
         return jsonify({
             "status": "started",
@@ -41,7 +48,7 @@ def start_calibration():
         })
     
     try:
-        if calibration_manager.start_calibration():
+        if main.calibration_manager.start_calibration():
             return jsonify({"status": "started"})
         else:
             return jsonify({"status": "error", "message": "Calibration already in progress"}), 400
@@ -52,7 +59,7 @@ def start_calibration():
 @app.route('/api/calibration/status', methods=['GET'])
 def get_calibration_status():
     """Get the current calibration status."""
-    if not calibration_manager:
+    if not hasattr(main, 'calibration_manager') or main.calibration_manager is None:
         # Return a placeholder status for web environment
         placeholder_status = {
             "status": "web_simulation",
@@ -65,7 +72,7 @@ def get_calibration_status():
         return jsonify(placeholder_status)
     
     try:
-        status = calibration_manager.get_calibration_status()
+        status = main.calibration_manager.get_calibration_status()
         return jsonify(status)
     except Exception as e:
         logger.error(f"Error getting calibration status: {str(e)}")
@@ -78,12 +85,12 @@ def get_calibration_status():
 @app.route('/api/calibration/cancel', methods=['POST'])
 def cancel_calibration():
     """Cancel the calibration process."""
-    if not calibration_manager:
+    if not hasattr(main, 'calibration_manager') or main.calibration_manager is None:
         # In web environment, return a simulated success response
         return jsonify({"status": "cancelled", "simulation": True})
     
     try:
-        if calibration_manager.cancel_calibration():
+        if main.calibration_manager.cancel_calibration():
             return jsonify({"status": "cancelled"})
         else:
             return jsonify({"status": "error", "message": "No calibration in progress"}), 400
@@ -94,12 +101,14 @@ def cancel_calibration():
 @app.route('/api/status', methods=['GET'])
 def get_status():
     """Get the current status of the system."""
-    global eye_tracker, blink_detector
-    
     # Check if we're in a web environment
     is_web_env = os.environ.get('REPL_ID') or not os.environ.get('DISPLAY')
     
-    if is_web_env and (eye_tracker is None or blink_detector is None):
+    # Check if the components are initialized
+    has_eye_tracker = hasattr(main, 'eye_tracker') and main.eye_tracker is not None
+    has_blink_detector = hasattr(main, 'blink_detector') and main.blink_detector is not None
+    
+    if is_web_env and (not has_eye_tracker or not has_blink_detector):
         # Return simulated status for web environment
         import random
         
@@ -111,7 +120,7 @@ def get_status():
         face_detected = random.random() < 0.95  # 95% chance of face detection
         
         return jsonify({
-            "running": True,
+            "running": main.running if hasattr(main, 'running') else False,
             "web_simulation": True,
             "face_detected": face_detected,
             "ear_value": simulated_ear,
@@ -126,21 +135,21 @@ def get_status():
     # For non-web environment or initialized trackers
     try:
         status = {
-            "running": eye_tracker is not None,
+            "running": hasattr(main, 'running') and main.running,
             "face_detected": False,
             "ear_value": 0.0,
             "blink_detected": False,
             "performance": {}
         }
         
-        if eye_tracker:
+        if has_eye_tracker:
             # Get actual status from eye tracker
-            status["face_detected"] = getattr(eye_tracker, 'face_detected', False)
-            status["ear_value"] = getattr(eye_tracker, 'last_ear_value', 0.0)
+            status["face_detected"] = getattr(main.eye_tracker, 'face_detected', False)
+            status["ear_value"] = getattr(main.eye_tracker, 'last_ear_value', 0.0)
             
             # Get performance metrics
-            frame_times = list(eye_tracker.frame_times) if hasattr(eye_tracker, 'frame_times') else []
-            process_times = list(eye_tracker.process_times) if hasattr(eye_tracker, 'process_times') else []
+            frame_times = list(main.eye_tracker.frame_times) if hasattr(main.eye_tracker, 'frame_times') else []
+            process_times = list(main.eye_tracker.process_times) if hasattr(main.eye_tracker, 'process_times') else []
             
             if frame_times:
                 avg_frame_time = sum(frame_times) / len(frame_times)
@@ -150,10 +159,10 @@ def get_status():
             if process_times:
                 status["performance"]["avg_process_time"] = sum(process_times) / len(process_times)
         
-        if blink_detector:
+        if has_blink_detector:
             # Get blink status
             try:
-                recent_blinks = blink_detector.get_recent_blinks()
+                recent_blinks = main.blink_detector.get_recent_blinks()
                 if recent_blinks:
                     latest_blink = max(recent_blinks)
                     status["blink_detected"] = (time.time() - latest_blink) < 0.5

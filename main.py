@@ -10,7 +10,7 @@ import threading
 import time
 from flask import Flask, render_template
 
-from eye_tracker import EyeTracker
+from eye_tracker import EyeTracker, IS_WEB_ENV
 from blink_detector import BlinkDetector
 from calibration import CalibrationManager
 from keyboard_ui import KeyboardUI
@@ -89,12 +89,35 @@ def tracking_loop():
     global running, eye_tracker, keyboard_ui
     
     logger.info("Tracking loop started")
+    
+    # For web interface integration - need to define update_latest_frame here
+    # to avoid circular import issues
+    update_frame_func = None
+    
+    try:
+        # Get reference to the update_latest_frame function after import
+        from web_interface import update_latest_frame
+        update_frame_func = update_latest_frame
+        logger.info("Web interface frame update function successfully loaded")
+    except Exception as e:
+        logger.warning(f"Could not import update_latest_frame: {e}")
+    
     try:
         while running:
             if eye_tracker and keyboard_ui:
                 frame = eye_tracker.process_frame()
                 if frame is not None:
+                    # Update keyboard UI
                     keyboard_ui.update(frame)
+                    
+                    # Send frame to web interface if available
+                    if update_frame_func:
+                        try:
+                            update_frame_func(frame)
+                        except Exception as e:
+                            logger.error(f"Error updating web interface frame: {e}")
+            
+            # Reduce sleep time for smoother animation in web environment
             time.sleep(0.01)  # Small sleep to prevent CPU overuse
     except Exception as e:
         logger.error(f"Error in tracking loop: {str(e)}")
