@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eye Tracking Keyboard | Assistive Technology</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+    <style>
+        .keyboard-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        
+        .key {
+            width: 50px;
+            height: 50px;
+            margin: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: var(--bs-dark);
+            border: 1px solid var(--bs-gray-700);
+            color: var(--bs-light);
+            transition: all 0.2s;
+        }
+        
+        .key.active {
+            background-color: var(--bs-primary);
+            color: white;
+            box-shadow: 0 0 10px rgba(var(--bs-primary-rgb), 0.5);
+        }
+        
+        .key.selected {
+            background-color: var(--bs-success);
+            color: white;
+            box-shadow: 0 0 15px rgba(var(--bs-success-rgb), 0.7);
+            transform: scale(1.1);
+        }
+        
+        .key.space {
+            width: 200px;
+        }
+        
+        .key.wide {
+            width: 80px;
+        }
+        
+        .keyboard-container {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            background-color: var(--bs-gray-900);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .prediction-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        
+        .prediction {
+            padding: 8px 16px;
+            margin: 0 5px;
+            border-radius: 20px;
+            background-color: var(--bs-gray-800);
+            color: var(--bs-light);
+            transition: all 0.2s;
+        }
+        
+        .prediction.active {
+            background-color: var(--bs-info);
+            color: white;
+        }
+        
+        .typed-text {
+            min-height: 100px;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: var(--bs-gray-800);
+            color: var(--bs-light);
+            font-size: 1.2rem;
+            white-space: pre-wrap;
+            overflow-y: auto;
+        }
+        
+        .blink-indicator {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+            background-color: var(--bs-gray);
+        }
+        
+        .blink-indicator.active {
+            background-color: var(--bs-success);
+            box-shadow: 0 0 10px rgba(var(--bs-success-rgb), 0.7);
+        }
+        
+        .scan-animation {
+            animation: scanHighlight 0.8s infinite;
+        }
+        
+        @keyframes scanHighlight {
+            0% {
+                background-color: var(--bs-dark);
+            }
+            50% {
+                background-color: var(--bs-primary);
+            }
+            100% {
+                background-color: var(--bs-dark);
+            }
+        }
+
+        /* Simulation mode styles */
+        .simulation-controls {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: var(--bs-gray-800);
+        }
+        
+        .simulation-controls .btn {
+            margin-right: 10px;
+        }
+        
+        .simulation-info {
+            margin-top: 10px;
+            font-style: italic;
+            color: var(--bs-gray-500);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i data-feather="eye" class="me-2"></i>
+                Eye Tracking System
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i data-feather="home" class="feather-small"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('calibration') }}">
+                            <i data-feather="sliders" class="feather-small"></i> Calibration
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('keyboard') }}">
+                            <i data-feather="type" class="feather-small"></i> Keyboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('settings') }}">
+                            <i data-feather="settings" class="feather-small"></i> Settings
+                        </a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <span id="statusIndicator" class="badge rounded-pill bg-secondary me-2">
+                        <i data-feather="activity" class="me-1"></i> Offline
+                    </span>
+                    <span id="faceIndicator" class="badge bg-secondary">No Face</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main content -->
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4>Eye Tracking Keyboard</h4>
+                        <div>
+                            <span class="blink-indicator" id="blinkIndicator"></span>
+                            <span id="blinkStatus">No Blink</span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Typed text display -->
+                        <div class="typed-text" id="typedText">|</div>
+                        
+                        <!-- Word predictions -->
+                        <div class="prediction-container">
+                            <div class="prediction" id="prediction1">the</div>
+                            <div class="prediction" id="prediction2">and</div>
+                            <div class="prediction" id="prediction3">that</div>
+                            <div class="prediction" id="prediction4">for</div>
+                            <div class="prediction" id="prediction5">you</div>
+                        </div>
+                        
+                        <!-- Virtual Keyboard -->
+                        <div class="keyboard-container">
+                            <!-- First row -->
+                            <div class="keyboard-row">
+                                <div class="key" data-key="q">Q</div>
+                                <div class="key" data-key="w">W</div>
+                                <div class="key" data-key="e">E</div>
+                                <div class="key" data-key="r">R</div>
+                                <div class="key" data-key="t">T</div>
+                                <div class="key" data-key="y">Y</div>
+                                <div class="key" data-key="u">U</div>
+                                <div class="key" data-key="i">I</div>
+                                <div class="key" data-key="o">O</div>
+                                <div class="key" data-key="p">P</div>
+                            </div>
+                            
+                            <!-- Second row -->
+                            <div class="keyboard-row">
+                                <div class="key" data-key="a">A</div>
+                                <div class="key" data-key="s">S</div>
+                                <div class="key" data-key="d">D</div>
+                                <div class="key" data-key="f">F</div>
+                                <div class="key" data-key="g">G</div>
+                                <div class="key" data-key="h">H</div>
+                                <div class="key" data-key="j">J</div>
+                                <div class="key" data-key="k">K</div>
+                                <div class="key" data-key="l">L</div>
+                            </div>
+                            
+                            <!-- Third row -->
+                            <div class="keyboard-row">
+                                <div class="key wide" data-key="shift">Shift</div>
+                                <div class="key" data-key="z">Z</div>
+                                <div class="key" data-key="x">X</div>
+                                <div class="key" data-key="c">C</div>
+                                <div class="key" data-key="v">V</div>
+                                <div class="key" data-key="b">B</div>
+                                <div class="key" data-key="n">N</div>
+                                <div class="key" data-key="m">M</div>
+                                <div class="key wide" data-key="backspace">⌫</div>
+                            </div>
+                            
+                            <!-- Fourth row -->
+                            <div class="keyboard-row">
+                                <div class="key wide" data-key="symbols">.?123</div>
+                                <div class="key" data-key=",">,</div>
+                                <div class="key space" data-key="space">Space</div>
+                                <div class="key" data-key=".">.</div>
+                                <div class="key wide" data-key="enter">Enter</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Simulation controls for web mode -->
+                        <div class="simulation-controls mt-4">
+                            <h5>Simulation Controls</h5>
+                            <p>Since this is running in a web environment, you can simulate blinks to interact with the keyboard:</p>
+                            <button class="btn btn-primary" id="simulateBlinkBtn">Simulate Blink</button>
+                            <button class="btn btn-secondary" id="resetTextBtn">Reset Text</button>
+                            
+                            <div class="simulation-info">
+                                <p>In the actual desktop application, your eye blinks would be used instead of this button.</p>
+                                <p>Current scan mode: <span id="scanModeText">Row Scanning</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Startup overlay -->
+    <div id="overlay" class="startup-overlay">
+        <div class="container h-100">
+            <div class="row h-100 justify-content-center align-items-center">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h4 class="card-title mb-4">Start Tracking</h4>
+                            <p class="card-text mb-4">Click the button below to start the eye tracking system.</p>
+                            <button id="startButton" class="btn btn-primary btn-lg mb-3">
+                                <i data-feather="eye" class="me-2"></i>
+                                Start Tracking
+                            </button>
+                            <p class="text-muted small">You can stop tracking at any time by clicking the Stop button.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Offline stop button -->
+    <div id="stopButtonContainer" class="stop-button-container" style="display: none;">
+        <button id="stopButton" class="btn btn-danger" disabled>
+            <i data-feather="stop-circle"></i> Stop Tracking
+        </button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            feather.replace();
+            
+            // Add event listeners for buttons
+            document.getElementById('startButton').addEventListener('click', startTracking);
+            document.getElementById('stopButton').addEventListener('click', stopTracking);
+            document.getElementById('simulateBlinkBtn').addEventListener('click', simulateBlink);
+            document.getElementById('resetTextBtn').addEventListener('click', resetText);
+            
+            // Initialize keyboard
+            initializeKeyboard();
+            
+            // Start status updates
+            setInterval(updateStatus, 1000);
+        });
+        
+        // Keyboard state
+        let currentMode = 'row'; // 'row', 'key', or 'prediction'
+        let activeRowIndex = 0;
+        let activeKeyIndex = 0;
+        let activePredictionIndex = 0;
+        let isShiftActive = false;
+        let typedText = '|';
+        let lastBlinkTime = 0;
+        
+        const rows = document.querySelectorAll('.keyboard-row');
+        const predictions = document.querySelectorAll('.prediction');
+        
+        function initializeKeyboard() {
+            // Start with row scanning
+            highlightCurrentRow();
+            
+            // Simulate row scanning
+            setInterval(function() {
+                if (currentMode === 'row') {
+                    moveToNextRow();
+                } else if (currentMode === 'key') {
+                    moveToNextKey();
+                } else if (currentMode === 'prediction') {
+                    moveToNextPrediction();
+                }
+            }, 800); // Scan interval
+        }
+        
+        function highlightCurrentRow() {
+            // Remove highlights from all rows
+            rows.forEach(row => {
+                Array.from(row.children).forEach(key => {
+                    key.classList.remove('active');
+                    key.classList.remove('scan-animation');
+                });
+            });
+            
+            // Highlight active row
+            Array.from(rows[activeRowIndex].children).forEach(key => {
+                key.classList.add('active');
+                key.classList.add('scan-animation');
+            });
+        }
+        
+        function highlightCurrentKey() {
+            // Remove highlights from all keys
+            rows.forEach(row => {
+                Array.from(row.children).forEach(key => {
+                    key.classList.remove('active');
+                    key.classList.remove('scan-animation');
+                });
+            });
+            
+            // Highlight active key
+            const keys = Array.from(rows[activeRowIndex].children);
+            if (activeKeyIndex < keys.length) {
+                keys[activeKeyIndex].classList.add('active');
+                keys[activeKeyIndex].classList.add('scan-animation');
+            }
+        }
+        
+        function highlightCurrentPrediction() {
+            // Remove highlights from all predictions
+            predictions.forEach(pred => {
+                pred.classList.remove('active');
+                pred.classList.remove('scan-animation');
+            });
+            
+            // Highlight active prediction
+            predictions[activePredictionIndex].classList.add('active');
+            predictions[activePredictionIndex].classList.add('scan-animation');
+        }
+        
+        function moveToNextRow() {
+            activeRowIndex = (activeRowIndex + 1) % rows.length;
+            highlightCurrentRow();
+            updateScanModeText('Row Scanning');
+        }
+        
+        function moveToNextKey() {
+            const keys = Array.from(rows[activeRowIndex].children);
+            activeKeyIndex = (activeKeyIndex + 1) % keys.length;
+            highlightCurrentKey();
+            updateScanModeText('Key Scanning');
+        }
+        
+        function moveToNextPrediction() {
+            activePredictionIndex = (activePredictionIndex + 1) % predictions.length;
+            highlightCurrentPrediction();
+            updateScanModeText('Word Prediction Scanning');
+        }
+        
+        function updateScanModeText(text) {
+            document.getElementById('scanModeText').textContent = text;
+        }
+        
+        function simulateBlink() {
+            // Debounce rapid clicks
+            const now = Date.now();
+            if (now - lastBlinkTime < 300) return;
+            lastBlinkTime = now;
+            
+            // Show blink indicator
+            const blinkIndicator = document.getElementById('blinkIndicator');
+            blinkIndicator.classList.add('active');
+            document.getElementById('blinkStatus').textContent = 'Blink Detected';
+            
+            // Process blink based on current mode
+            if (currentMode === 'row') {
+                currentMode = 'key';
+                activeKeyIndex = 0;
+                highlightCurrentKey();
+                updateScanModeText('Key Scanning');
+            } else if (currentMode === 'key') {
+                // Select the key
+                const key = Array.from(rows[activeRowIndex].children)[activeKeyIndex];
+                key.classList.add('selected');
+                
+                // Process the selected key
+                processKeySelection(key.getAttribute('data-key'));
+                
+                // After a short delay, remove selection effect and return to row scanning
+                setTimeout(function() {
+                    key.classList.remove('selected');
+                    currentMode = 'row';
+                    highlightCurrentRow();
+                    updateScanModeText('Row Scanning');
+                }, 500);
+            } else if (currentMode === 'prediction') {
+                // Select the prediction
+                const pred = predictions[activePredictionIndex];
+                pred.classList.add('selected');
+                
+                // Apply the prediction
+                applyPrediction(pred.textContent);
+                
+                // After a short delay, remove selection effect and return to row scanning
+                setTimeout(function() {
+                    pred.classList.remove('selected');
+                    currentMode = 'row';
+                    highlightCurrentRow();
+                    updateScanModeText('Row Scanning');
+                }, 500);
+            }
+            
+            // Reset blink indicator after a short delay
+            setTimeout(function() {
+                blinkIndicator.classList.remove('active');
+                document.getElementById('blinkStatus').textContent = 'No Blink';
+            }, 500);
+        }
+        
+        function processKeySelection(keyValue) {
+            // Handle different types of keys
+            if (keyValue === 'backspace') {
+                // Remove last character
+                if (typedText.length > 1) {
+                    typedText = typedText.substring(0, typedText.length - 2) + '|';
+                }
+            } else if (keyValue === 'space') {
+                typedText = typedText.substring(0, typedText.length - 1) + ' |';
+                // After space, show predictions
+                currentMode = 'prediction';
+                activePredictionIndex = 0;
+                highlightCurrentPrediction();
+            } else if (keyValue === 'enter') {
+                typedText = typedText.substring(0, typedText.length - 1) + '\n|';
+            } else if (keyValue === 'shift') {
+                isShiftActive = !isShiftActive;
+                // Update key labels to show uppercase/lowercase
+                updateKeyLabels();
+            } else if (keyValue === 'symbols') {
+                // For demonstration, we'll just show an alert
+                alert('Symbol keyboard would be shown here');
+            } else {
+                // Regular character
+                let char = keyValue;
+                if (isShiftActive) {
+                    char = char.toUpperCase();
+                }
+                typedText = typedText.substring(0, typedText.length - 1) + char + '|';
+            }
+            
+            // Update the displayed text
+            document.getElementById('typedText').textContent = typedText;
+            
+            // Update predictions (simulated)
+            updatePredictions();
+        }
+        
+        function updateKeyLabels() {
+            // Update all letter keys to show uppercase or lowercase based on shift state
+            document.querySelectorAll('.key').forEach(key => {
+                const keyValue = key.getAttribute('data-key');
+                if (keyValue && keyValue.length === 1 && keyValue.match(/[a-z]/i)) {
+                    key.textContent = isShiftActive ? keyValue.toUpperCase() : keyValue.toLowerCase();
+                }
+            });
+        }
+        
+        function applyPrediction(word) {
+            // Find the last word in typedText and replace it
+            const textWithoutCursor = typedText.substring(0, typedText.length - 1);
+            const words = textWithoutCursor.split(/\s+/);
+            
+            if (words.length > 0) {
+                // Replace the last word or add the prediction if at the beginning of input
+                if (textWithoutCursor.trim().length === 0) {
+                    typedText = word + ' |';
+                } else {
+                    words[words.length - 1] = word;
+                    typedText = words.join(' ') + ' |';
+                }
+                
+                // Update the displayed text
+                document.getElementById('typedText').textContent = typedText;
+            }
+        }
+        
+        function updatePredictions() {
+            // This would normally call the NLP module to get real predictions
+            // For demonstration, we'll use simple common words
+            const commonWords = [
+                'the', 'be', 'to', 'of', 'and',
+                'a', 'in', 'that', 'have', 'I',
+                'it', 'for', 'not', 'on', 'with',
+                'he', 'as', 'you', 'do', 'at'
+            ];
+            
+            // Simulate predictions based on typed text
+            const textWithoutCursor = typedText.substring(0, typedText.length - 1);
+            const words = textWithoutCursor.split(/\s+/);
+            const lastWord = words[words.length - 1];
+            
+            // Get some random "predictions" for demo purposes
+            const shuffled = [...commonWords].sort(() => 0.5 - Math.random());
+            const selectedWords = shuffled.slice(0, 5);
+            
+            // Update prediction elements
+            predictions.forEach((pred, index) => {
+                pred.textContent = selectedWords[index];
+            });
+        }
+        
+        function resetText() {
+            typedText = '|';
+            document.getElementById('typedText').textContent = typedText;
+        }
+        
+        function startTracking() {
+            fetch('/api/start', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                document.getElementById('overlay').style.display = 'none';
+                document.getElementById('stopButtonContainer').style.display = 'block';
+                document.getElementById('startButton').disabled = true;
+                document.getElementById('stopButton').disabled = false;
+                document.getElementById('statusIndicator').className = 'badge rounded-pill bg-success me-2';
+                document.getElementById('statusIndicator').innerHTML = '<i data-feather="activity" class="me-1"></i> Online';
+                feather.replace();
+            })
+            .catch(error => {
+                console.error('Error starting tracking:', error);
+                document.getElementById('statusIndicator').className = 'badge rounded-pill bg-danger me-2';
+                document.getElementById('statusIndicator').innerHTML = '<i data-feather="alert-triangle" class="me-1"></i> Error';
+                feather.replace();
+            });
+        }
+        
+        function stopTracking() {
+            fetch('/api/stop', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                document.getElementById('overlay').style.display = 'flex';
+                document.getElementById('stopButtonContainer').style.display = 'none';
+                document.getElementById('startButton').disabled = false;
+                document.getElementById('stopButton').disabled = true;
+                document.getElementById('statusIndicator').className = 'badge rounded-pill bg-secondary me-2';
+                document.getElementById('statusIndicator').innerHTML = '<i data-feather="activity" class="me-1"></i> Offline';
+                feather.replace();
+            })
+            .catch(error => {
+                console.error('Error stopping tracking:', error);
+                document.getElementById('statusIndicator').className = 'badge rounded-pill bg-warning me-2';
+                document.getElementById('statusIndicator').innerHTML = '<i data-feather="alert-triangle" class="me-1"></i> Error';
+                feather.replace();
+            });
+        }
+        
+        function updateStatus() {
+            fetch('/api/status', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Update face detection status
+                document.getElementById('faceIndicator').textContent = data.face_detected ? 'Face Detected' : 'No Face';
+                document.getElementById('faceIndicator').className = data.face_detected ? 'badge bg-success' : 'badge bg-secondary';
+                
+                // Update status indicator if not in calibration
+                if (document.getElementById('overlay').style.display === 'none') {
+                    document.getElementById('statusIndicator').className = data.running ? 'badge rounded-pill bg-success me-2' : 'badge rounded-pill bg-secondary me-2';
+                    document.getElementById('statusIndicator').innerHTML = data.running ? '<i data-feather="activity" class="me-1"></i> Online' : '<i data-feather="activity" class="me-1"></i> Offline';
+                    feather.replace();
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching status:', error);
+            });
+        }
+    </script>
+</body>
+</html>

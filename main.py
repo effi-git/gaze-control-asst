@@ -158,6 +158,11 @@ def settings():
     """Render the settings interface."""
     return render_template('settings.html')
 
+@app.route('/keyboard')
+def keyboard():
+    """Render the virtual keyboard interface."""
+    return render_template('keyboard.html')
+
 @app.route('/test')
 def test_page():
     """Render the API test page."""
