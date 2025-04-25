@@ -8,9 +8,13 @@ import logging
 import time
 import numpy as np
 import threading
+import os
 from collections import deque
 
 logger = logging.getLogger(__name__)
+
+# Check if we're in a web environment (Replit)
+IS_WEB_ENV = os.environ.get('REPL_ID') or not os.environ.get('DISPLAY')
 
 class EyeTracker:
     """
@@ -59,6 +63,13 @@ class EyeTracker:
 
     def initialize_camera(self):
         """Initialize the camera with specified resolution."""
+        # If we're in a web environment, create a mock camera instead
+        if IS_WEB_ENV:
+            logger.info("Web environment detected. Using simulated camera.")
+            self.cap = None
+            return True
+            
+        # Only try to access real camera in desktop environment
         try:
             self.cap = cv2.VideoCapture(0)
             if not self.cap.isOpened():
@@ -140,12 +151,177 @@ class EyeTracker:
         Returns the processed frame with annotations.
         """
         with self.lock:
+            frame_start_time = time.time()
+            
+            # Web environment simulation
+            if IS_WEB_ENV:
+                try:
+                    # Create a simulated frame
+                    frame = np.zeros((self.frame_height, self.frame_width, 3), dtype=np.uint8)
+                    frame_size = frame.shape
+                    
+                    # Add background gradient
+                    for y in range(frame.shape[0]):
+                        color_val = int(40 + (y / frame.shape[0]) * 40)
+                        cv2.line(frame, (0, y), (frame.shape[1], y), (color_val, color_val, color_val), 1)
+                    
+                    # Simulate face detection status
+                    import random
+                    
+                    # Occasionally simulate losing face detection
+                    if self.frame_count % 150 == 0:
+                        self.face_detected = random.random() > 0.3
+                    else:
+                        # Most of the time face is detected in simulation
+                        self.face_detected = random.random() > 0.05
+                    
+                    # Simulate random EAR value
+                    ear_fluctuation = 0.05 * np.sin(self.frame_count / 10.0)
+                    ear_avg = 0.3 + 0.05 * random.random() + ear_fluctuation
+                    
+                    # Occasionally simulate blinks
+                    blink_probability = 0.02  # 2% chance per frame
+                    blink_detected = random.random() < blink_probability
+                    
+                    if blink_detected:
+                        self.last_blink_time = time.time()
+                        # During blinks, EAR drops significantly
+                        ear_avg = 0.15 + 0.05 * random.random()
+                    
+                    # Store the simulated EAR value
+                    self.last_ear_value = ear_avg
+                    
+                    # Simulate calibration update
+                    if self.calibration_manager:
+                        calibration_status = self.calibration_manager.update_calibration(ear_avg)
+                        # Display calibration information if in progress
+                        if calibration_status and calibration_status.get("status") == "in_progress":
+                            self._draw_calibration_info(frame, calibration_status)
+                    
+                    # Simulate blink detection
+                    if self.blink_detector:
+                        # Use the actual blink detector with simulated EAR values
+                        real_blink = self.blink_detector.update_ear(ear_avg)
+                        if real_blink:
+                            blink_detected = True
+                            self.last_blink_time = time.time()
+                    
+                    # Draw simulated eye landmarks
+                    def create_simulated_landmark(x, y):
+                        class SimLandmark:
+                            def __init__(self, x, y):
+                                self.x = x
+                                self.y = y
+                        return SimLandmark(x, y)
+                    
+                    # Create simulated landmarks for eyes
+                    eye_size = 0.03
+                    left_center_x, left_center_y = 0.3, 0.4
+                    right_center_x, right_center_y = 0.7, 0.4
+                    
+                    # Add slight random movement to simulate natural eye motion
+                    drift_x = 0.005 * np.sin(self.frame_count / 20.0)
+                    drift_y = 0.005 * np.cos(self.frame_count / 15.0)
+                    
+                    left_center_x += drift_x
+                    left_center_y += drift_y
+                    right_center_x += drift_x
+                    right_center_y += drift_y
+                    
+                    # Define eye shapes - adjust during blinks
+                    vertical_scale = 1.0
+                    if blink_detected or (time.time() - self.last_blink_time) < 0.2:
+                        vertical_scale = 0.3  # Eye nearly closed during blink
+                    
+                    # Left eye landmarks (roughly oval shape)
+                    left_eye_landmarks = [
+                        create_simulated_landmark(left_center_x - eye_size, left_center_y),  # left
+                        create_simulated_landmark(left_center_x - eye_size*0.5, left_center_y - eye_size*vertical_scale),  # top left
+                        create_simulated_landmark(left_center_x + eye_size*0.5, left_center_y - eye_size*vertical_scale),  # top right
+                        create_simulated_landmark(left_center_x + eye_size, left_center_y),  # right
+                        create_simulated_landmark(left_center_x + eye_size*0.5, left_center_y + eye_size*vertical_scale),  # bottom right
+                        create_simulated_landmark(left_center_x - eye_size*0.5, left_center_y + eye_size*vertical_scale)   # bottom left
+                    ]
+                    
+                    # Right eye landmarks (roughly oval shape)
+                    right_eye_landmarks = [
+                        create_simulated_landmark(right_center_x - eye_size, right_center_y),  # left
+                        create_simulated_landmark(right_center_x - eye_size*0.5, right_center_y - eye_size*vertical_scale),  # top left
+                        create_simulated_landmark(right_center_x + eye_size*0.5, right_center_y - eye_size*vertical_scale),  # top right
+                        create_simulated_landmark(right_center_x + eye_size, right_center_y),  # right
+                        create_simulated_landmark(right_center_x + eye_size*0.5, right_center_y + eye_size*vertical_scale),  # bottom right
+                        create_simulated_landmark(right_center_x - eye_size*0.5, right_center_y + eye_size*vertical_scale)   # bottom left
+                    ]
+                    
+                    # Draw a simple face outline
+                    face_color = (150, 150, 150)
+                    if self.face_detected:
+                        # Draw face oval
+                        center = (int(frame.shape[1] * 0.5), int(frame.shape[0] * 0.4))
+                        axes = (int(frame.shape[1] * 0.25), int(frame.shape[0] * 0.35))
+                        cv2.ellipse(frame, center, axes, 0, 0, 360, face_color, 1)
+                        
+                        # Draw eyes with landmarks
+                        self._draw_eye_landmarks(frame, left_eye_landmarks, right_eye_landmarks)
+                        
+                        # Draw mouth - change shape slightly based on time
+                        mouth_y = 0.65 + 0.02 * np.sin(self.frame_count / 30.0)
+                        mouth_width = 0.3
+                        mouth_height = 0.03 + 0.01 * np.sin(self.frame_count / 20.0)
+                        
+                        mouth_left = int(frame.shape[1] * (0.5 - mouth_width/2))
+                        mouth_right = int(frame.shape[1] * (0.5 + mouth_width/2))
+                        mouth_y_pos = int(frame.shape[0] * mouth_y)
+                        
+                        # Draw curved mouth
+                        for i in range(mouth_left, mouth_right):
+                            x_rel = (i - mouth_left) / (mouth_right - mouth_left)
+                            # Parabolic curve for mouth
+                            y_offset = int(frame.shape[0] * mouth_height * 4 * (x_rel - 0.5)**2)
+                            cv2.circle(frame, (i, mouth_y_pos + y_offset), 1, face_color, -1)
+                    else:
+                        # Draw "No Face Detected" message
+                        cv2.putText(frame, "No Face Detected", 
+                                   (int(frame.shape[1] * 0.3), int(frame.shape[0] * 0.5)), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 50, 50), 2)
+                    
+                    # Add performance metrics to frame (simulated)
+                    fps = 25 + 5 * np.sin(self.frame_count / 50.0)
+                    process_time = 15 + 5 * np.sin(self.frame_count / 40.0)
+                    
+                    fps_text = f"FPS: {fps:.1f}"
+                    cv2.putText(frame, fps_text, (frame.shape[1] - 150, 30), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    
+                    process_text = f"Process: {process_time:.1f}ms"
+                    cv2.putText(frame, process_text, (frame.shape[1] - 230, 60), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    
+                    # Add status indicators
+                    self._add_status_indicators(frame, blink_detected)
+                    
+                    # Add "SIMULATION" indicator
+                    cv2.putText(frame, "SIMULATION MODE", (20, frame.shape[0] - 20), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 50), 1)
+                    
+                    # Update frame count for animation
+                    self.frame_count += 1
+                    
+                    # Calculate frame processing time (simulated)
+                    frame_end_time = time.time()
+                    self.frame_times.append((frame_end_time - frame_start_time) * 1000)  # in ms
+                    
+                    return frame
+                
+                except Exception as e:
+                    logger.error(f"Error in simulation mode: {str(e)}")
+                    return None
+            
+            # Real camera processing for desktop environment
             if self.cap is None or not self.cap.isOpened():
                 logger.error("Camera not initialized or closed")
                 return None
                 
-            frame_start_time = time.time()
-            
             try:
                 success, frame = self.cap.read()
                 if not success or frame is None:
