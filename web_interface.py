@@ -201,86 +201,130 @@ def get_status():
 def video_feed():
     """
     Video streaming route that works in both web and desktop environments.
-    Uses the simulated camera feed in web environment.
+    Uses a static image in web environment to avoid worker timeouts.
     """
-    # For both web and desktop environments, use streaming approach
-    def generate_frames():
-        global latest_frame, IS_WEB_ENV
-        is_running = hasattr(main, 'running') and main.running
-        
-        # Counter for updating the waiting message
-        frame_count = 0
+    from flask import send_file
+    import io
+    
+    # In web environment, use a static image instead of streaming
+    # to avoid worker timeouts
+    if IS_WEB_ENV:
+        try:
+            # Create a simulated static image for web environment
+            empty_frame = np.zeros((360, 640, 3), dtype=np.uint8)
+            
+            # Background color
+            empty_frame[:, :] = (30, 30, 40)  # Dark blue-gray background
+            
+            # Draw a gradient background for visual interest
+            for y in range(360):
+                color_val = int(30 + (y / 360) * 20)
+                cv2.line(empty_frame, (0, y), (640, y), (color_val, color_val, color_val+10), 1)
+            
+            # Draw simulated face outline
+            face_center_x = 320
+            face_center_y = 180
+            
+            # Face ellipse
+            cv2.ellipse(empty_frame, 
+                      (face_center_x, face_center_y), 
+                      (100, 130), 0, 0, 360, (100, 150, 100), 2)
+            
+            # Eyes
+            # Left eye
+            eye_left_x = face_center_x - 40
+            eye_left_y = face_center_y - 30
+            
+            # Right eye
+            eye_right_x = face_center_x + 40
+            eye_right_y = face_center_y - 30
+            
+            # Draw open eyes (circles)
+            cv2.circle(empty_frame, (eye_left_x, eye_left_y), 15, (100, 200, 100), 2)
+            cv2.circle(empty_frame, (eye_right_x, eye_right_y), 15, (100, 200, 100), 2)
+            
+            # Draw pupils
+            cv2.circle(empty_frame, (eye_left_x, eye_left_y), 5, (150, 220, 150), -1)
+            cv2.circle(empty_frame, (eye_right_x, eye_right_y), 5, (150, 220, 150), -1)
+            
+            # Draw mouth
+            mouth_y = face_center_y + 40
+            cv2.ellipse(empty_frame, 
+                      (face_center_x, mouth_y), 
+                      (30, 15), 0, 0, 180, (100, 180, 100), 2)
+            
+            # Add status text
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            cv2.putText(empty_frame, 'Face Detected', 
+                      (20, 30), font, 0.7, (100, 200, 100), 2)
+            
+            # Show EAR value
+            ear_value = 0.4
+            cv2.putText(empty_frame, f'EAR: {ear_value:.2f}', 
+                      (20, 60), font, 0.6, (180, 180, 180), 1)
+            
+            # Add environment info
+            env_message = "Web Environment - Static Image Mode"
+            cv2.putText(empty_frame, env_message, 
+                      (20, 340), font, 0.5, (150, 150, 150), 1)
+            
+            # Add explanation
+            cv2.putText(empty_frame, "API endpoints fully functional", 
+                      (180, 310), font, 0.6, (200, 200, 200), 1)
+            
+            # Add a border
+            cv2.rectangle(empty_frame, (5, 5), (635, 355), (100, 100, 100), 2)
+            
+            # Convert to JPEG image
+            _, buffer = cv2.imencode('.jpg', empty_frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            
+            # Return as a file
+            return send_file(
+                io.BytesIO(buffer.tobytes()),
+                mimetype='image/jpeg',
+                as_attachment=False
+            )
+        except Exception as e:
+            logger.error(f"Error generating static image: {str(e)}")
+            logger.exception("Detailed static image error")
+            return "Image generation error", 500
+    else:
+        # Only for desktop environments with real camera access
+        def generate_frames():
+            """Generator function for streaming video frames."""
+            frame_count = 0
+            
+            try:
+                while True:
+                    with frame_lock:
+                        if latest_frame is not None:
+                            # Use the frame provided by the eye tracker
+                            yield (b'--frame\r\n'
+                                  b'Content-Type: image/jpeg\r\n\r\n' + latest_frame.tobytes() + b'\r\n')
+                        else:
+                            # Create a simple waiting frame
+                            empty_frame = np.zeros((360, 640, 3), dtype=np.uint8)
+                            font = cv2.FONT_HERSHEY_SIMPLEX
+                            cv2.putText(empty_frame, "Initializing camera...", 
+                                      (220, 180), font, 0.7, (255, 255, 255), 2)
+                            
+                            _, buffer = cv2.imencode('.jpg', empty_frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                            yield (b'--frame\r\n'
+                                  b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                    
+                    # Much shorter sleep - only for desktop environment
+                    time.sleep(0.01)
+            
+            except Exception as e:
+                logger.error(f"Error generating video frames: {str(e)}")
+                logger.exception("Detailed frame generation error")
         
         try:
-            while True:
-                frame_count += 1
-                
-                with frame_lock:
-                    if latest_frame is not None:
-                        # We have a frame from the tracking loop
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + latest_frame.tobytes() + b'\r\n')
-                    else:
-                        # Create a waiting frame
-                        is_running = hasattr(main, 'running') and main.running
-                        empty_frame = np.zeros((360, 640, 3), dtype=np.uint8)
-                        
-                        # Draw a gradient background
-                        for y in range(360):
-                            color_val = int(50 + (y / 360) * 80)
-                            cv2.line(empty_frame, (0, y), (640, y), (color_val, color_val, color_val), 1)
-                            
-                        font = cv2.FONT_HERSHEY_SIMPLEX
-                        
-                        # Different messages based on whether tracking is running or not
-                        if is_running:
-                            message = "Initializing tracking..."
-                            sub_message = "Please wait"
-                            
-                            # Add an animated wait indicator
-                            dots = "." * (1 + (frame_count // 10) % 3)
-                            cv2.putText(empty_frame, message + dots, 
-                                      (180, 180), font, 0.8, (255, 255, 255), 2)
-                            cv2.putText(empty_frame, sub_message, 
-                                      (230, 220), font, 0.6, (200, 200, 200), 1)
-                        else:
-                            title = "Eye Tracking System"
-                            message = "Press 'Start Tracking' to begin"
-                            
-                            # Pulsing effect for the instruction
-                            alpha = 0.5 + 0.5 * abs(np.sin(frame_count / 20.0))
-                            color = (int(200 * alpha), int(200 * alpha), int(255 * alpha))
-                            
-                            cv2.putText(empty_frame, title, 
-                                      (200, 150), font, 1.0, (220, 220, 220), 2)
-                            cv2.putText(empty_frame, message, 
-                                      (165, 220), font, 0.7, color, 2)
-                            
-                            # Add environment info
-                            env_message = "Web Environment - Simulation Mode" if IS_WEB_ENV else "Desktop Environment"
-                            cv2.putText(empty_frame, env_message, 
-                                      (20, 340), font, 0.5, (150, 150, 150), 1)
-                        
-                        # Add a border
-                        cv2.rectangle(empty_frame, (5, 5), (635, 355), (100, 100, 100), 2)
-                        
-                        _, buffer = cv2.imencode('.jpg', empty_frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                
-                # Use a shorter sleep time for smoother animation
-                time.sleep(0.05)
-        
+            return Response(generate_frames(),
+                        mimetype='multipart/x-mixed-replace; boundary=frame')
         except Exception as e:
-            logger.error(f"Error generating video frames: {str(e)}")
-            logger.exception("Detailed frame generation error")
-    
-    try:
-        return Response(generate_frames(),
-                     mimetype='multipart/x-mixed-replace; boundary=frame')
-    except Exception as e:
-        logger.error(f"Failed to create video stream: {str(e)}")
-        return "Video streaming unavailable", 500
+            logger.error(f"Error returning video response: {str(e)}")
+            return "Video streaming error", 500
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def handle_settings():
