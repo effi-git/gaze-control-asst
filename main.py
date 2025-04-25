@@ -87,15 +87,18 @@ def stop_tracking():
 def tracking_loop():
     """Main tracking loop that runs in a separate thread."""
     global running, eye_tracker, keyboard_ui
+    from eye_tracker import IS_WEB_ENV
     
     logger.info("Tracking loop started")
     
-    # For web interface integration - need to define update_latest_frame here
-    # to avoid circular import issues
+    # For web interface integration - need to define update_latest_frame only after
+    # all application setup is complete to avoid circular import issues
     update_frame_func = None
     
+    # Wait a moment for all Flask routes to be registered
+    time.sleep(0.5)
     try:
-        # Get reference to the update_latest_frame function after import
+        # Now import the update_latest_frame function
         from web_interface import update_latest_frame
         update_frame_func = update_latest_frame
         logger.info("Web interface frame update function successfully loaded")
@@ -103,24 +106,38 @@ def tracking_loop():
         logger.warning(f"Could not import update_latest_frame: {e}")
     
     try:
+        # Use shorter sleep time in web environment for smoother animation
+        sleep_time = 0.01 if IS_WEB_ENV else 0.03
+        
         while running:
-            if eye_tracker and keyboard_ui:
+            if eye_tracker:
+                # Process a frame from camera or simulation
                 frame = eye_tracker.process_frame()
+                
                 if frame is not None:
-                    # Update keyboard UI
-                    keyboard_ui.update(frame)
+                    # Update keyboard UI if available
+                    if keyboard_ui:
+                        keyboard_ui.update(frame)
                     
-                    # Send frame to web interface if available
+                    # Send frame to web interface for display
                     if update_frame_func:
                         try:
                             update_frame_func(frame)
                         except Exception as e:
                             logger.error(f"Error updating web interface frame: {e}")
-            
-            # Reduce sleep time for smoother animation in web environment
-            time.sleep(0.01)  # Small sleep to prevent CPU overuse
+                            logger.error(f"Error details: {str(e)}")
+                else:
+                    logger.warning("Received None frame from eye_tracker.process_frame()")
+            else:
+                # If eye_tracker is not initialized, sleep longer
+                time.sleep(0.1)
+                continue
+                
+            # Small sleep to prevent CPU overuse
+            time.sleep(sleep_time)
     except Exception as e:
         logger.error(f"Error in tracking loop: {str(e)}")
+        logger.exception("Detailed tracking loop error")
         running = False
     finally:
         logger.info("Tracking loop ended")

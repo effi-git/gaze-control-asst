@@ -16,10 +16,27 @@ from flask import request, jsonify, Response, render_template, session
 import main 
 app = main.app  # Use the app from main.py
 
-# These will be accessed directly from main when needed, avoiding the circular import
-# eye_tracker = None
-# calibration_manager = None
-# blink_detector = None
+# Import the IS_WEB_ENV variable to use consistently across all files
+try:
+    from eye_tracker import IS_WEB_ENV
+except ImportError:
+    # Fallback if not yet imported
+    IS_WEB_ENV = os.environ.get('REPL_ID') is not None or not os.environ.get('DISPLAY')
+
+# Add CORS headers to all responses
+@app.after_request
+def add_cors_headers(response):
+    """Add CORS headers to all responses."""
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    return response
+
+# Handle OPTIONS requests for CORS preflight
+@app.route('/api/<path:path>', methods=['OPTIONS'])
+def options_handler(path):
+    """Handle OPTIONS requests for CORS preflight."""
+    return jsonify({})
 
 logger = logging.getLogger(__name__)
 
@@ -101,14 +118,11 @@ def cancel_calibration():
 @app.route('/api/status', methods=['GET'])
 def get_status():
     """Get the current status of the system."""
-    # Check if we're in a web environment
-    is_web_env = os.environ.get('REPL_ID') or not os.environ.get('DISPLAY')
-    
     # Check if the components are initialized
     has_eye_tracker = hasattr(main, 'eye_tracker') and main.eye_tracker is not None
     has_blink_detector = hasattr(main, 'blink_detector') and main.blink_detector is not None
     
-    if is_web_env and (not has_eye_tracker or not has_blink_detector):
+    if IS_WEB_ENV and (not has_eye_tracker or not has_blink_detector):
         # Return simulated status for web environment
         import random
         
@@ -182,82 +196,101 @@ def get_status():
 @app.route('/video_feed')
 def video_feed():
     """
-    Video streaming route - simplified for web environment.
-    For Replit environment, we return a static placeholder instead of live streaming 
-    to prevent worker timeouts.
+    Video streaming route that works in both web and desktop environments.
+    Uses the simulated camera feed in web environment.
     """
-    # Check if we're in a web environment
-    is_web_env = os.environ.get('REPL_ID') or not os.environ.get('DISPLAY')
-    
-    if is_web_env:
-        # For web environment, return a static placeholder image
-        placeholder = np.zeros((360, 640, 3), dtype=np.uint8)
-        font = cv2.FONT_HERSHEY_SIMPLEX
+    # For both web and desktop environments, use streaming approach
+    def generate_frames():
+        global latest_frame, IS_WEB_ENV
+        is_running = hasattr(main, 'running') and main.running
         
-        # Draw a gradient background
-        for y in range(360):
-            color_val = int(50 + (y / 360) * 100)
-            cv2.line(placeholder, (0, y), (640, y), (color_val, color_val, color_val), 1)
-            
-        # Add informative text
-        cv2.putText(placeholder, "Camera Feed Unavailable in Web Environment", 
-                   (40, 100), font, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
-        cv2.putText(placeholder, "This is a simulation environment only", 
-                   (140, 150), font, 0.6, (200, 200, 200), 1, cv2.LINE_AA)
-        cv2.putText(placeholder, "Press 'Start Tracking' to begin demo", 
-                   (140, 200), font, 0.6, (200, 200, 200), 1, cv2.LINE_AA)
-        
-        # Add a border
-        cv2.rectangle(placeholder, (5, 5), (635, 355), (100, 100, 100), 2)
-        
-        # Encode the image
-        _, img_encoded = cv2.imencode('.jpg', placeholder, [cv2.IMWRITE_JPEG_QUALITY, 90])
-        response = Response(img_encoded.tobytes(), mimetype='image/jpeg')
-        
-        logger.info("Serving static placeholder for video feed in web environment")
-        return response
-    else:
-        # For desktop environment with actual camera, use streaming approach
-        def generate_frames():
-            global latest_frame
-            try:
-                while True:
-                    with frame_lock:
-                        if latest_frame is not None:
-                            yield (b'--frame\r\n'
-                                   b'Content-Type: image/jpeg\r\n\r\n' + latest_frame.tobytes() + b'\r\n')
-                        else:
-                            # Create a simple waiting frame
-                            empty_frame = np.zeros((360, 640, 3), dtype=np.uint8)
-                            cv2.putText(empty_frame, "Waiting for camera...", 
-                                      (180, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                            _, buffer = cv2.imencode('.jpg', empty_frame)
-                            yield (b'--frame\r\n'
-                                   b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                    # Use a shorter sleep time for actual streaming
-                    time.sleep(0.03)
-            except Exception as e:
-                logger.error(f"Error generating video frames: {str(e)}")
+        # Counter for updating the waiting message
+        frame_count = 0
         
         try:
-            return Response(generate_frames(),
-                          mimetype='multipart/x-mixed-replace; boundary=frame')
+            while True:
+                frame_count += 1
+                
+                with frame_lock:
+                    if latest_frame is not None:
+                        # We have a frame from the tracking loop
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + latest_frame.tobytes() + b'\r\n')
+                    else:
+                        # Create a waiting frame
+                        is_running = hasattr(main, 'running') and main.running
+                        empty_frame = np.zeros((360, 640, 3), dtype=np.uint8)
+                        
+                        # Draw a gradient background
+                        for y in range(360):
+                            color_val = int(50 + (y / 360) * 80)
+                            cv2.line(empty_frame, (0, y), (640, y), (color_val, color_val, color_val), 1)
+                            
+                        font = cv2.FONT_HERSHEY_SIMPLEX
+                        
+                        # Different messages based on whether tracking is running or not
+                        if is_running:
+                            message = "Initializing tracking..."
+                            sub_message = "Please wait"
+                            
+                            # Add an animated wait indicator
+                            dots = "." * (1 + (frame_count // 10) % 3)
+                            cv2.putText(empty_frame, message + dots, 
+                                      (180, 180), font, 0.8, (255, 255, 255), 2)
+                            cv2.putText(empty_frame, sub_message, 
+                                      (230, 220), font, 0.6, (200, 200, 200), 1)
+                        else:
+                            title = "Eye Tracking System"
+                            message = "Press 'Start Tracking' to begin"
+                            
+                            # Pulsing effect for the instruction
+                            alpha = 0.5 + 0.5 * abs(np.sin(frame_count / 20.0))
+                            color = (int(200 * alpha), int(200 * alpha), int(255 * alpha))
+                            
+                            cv2.putText(empty_frame, title, 
+                                      (200, 150), font, 1.0, (220, 220, 220), 2)
+                            cv2.putText(empty_frame, message, 
+                                      (165, 220), font, 0.7, color, 2)
+                            
+                            # Add environment info
+                            env_message = "Web Environment - Simulation Mode" if IS_WEB_ENV else "Desktop Environment"
+                            cv2.putText(empty_frame, env_message, 
+                                      (20, 340), font, 0.5, (150, 150, 150), 1)
+                        
+                        # Add a border
+                        cv2.rectangle(empty_frame, (5, 5), (635, 355), (100, 100, 100), 2)
+                        
+                        _, buffer = cv2.imencode('.jpg', empty_frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                
+                # Use a shorter sleep time for smoother animation
+                time.sleep(0.05)
+        
         except Exception as e:
-            logger.error(f"Failed to create video stream: {str(e)}")
-            return "Video streaming unavailable", 500
+            logger.error(f"Error generating video frames: {str(e)}")
+            logger.exception("Detailed frame generation error")
+    
+    try:
+        return Response(generate_frames(),
+                     mimetype='multipart/x-mixed-replace; boundary=frame')
+    except Exception as e:
+        logger.error(f"Failed to create video stream: {str(e)}")
+        return "Video streaming unavailable", 500
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def handle_settings():
     """Get or update system settings."""
-    # Check if we're in a web environment
-    is_web_env = os.environ.get('REPL_ID') or not os.environ.get('DISPLAY')
+    # Check if the components are initialized
+    has_blink_detector = hasattr(main, 'blink_detector') and main.blink_detector is not None
+    has_keyboard_ui = hasattr(main, 'keyboard_ui') and main.keyboard_ui is not None
     
     if request.method == 'POST':
         try:
             settings = request.json
             
             # For web environment with no detectors initialized, return simulated success
-            if is_web_env and (not blink_detector or not hasattr(app, 'keyboard_ui')):
+            if IS_WEB_ENV and (not has_blink_detector or not has_keyboard_ui):
                 logger.info(f"Web simulation: settings update requested: {settings}")
                 return jsonify({
                     "status": "success", 
@@ -266,13 +299,13 @@ def handle_settings():
                 })
             
             # Update blink detector settings if provided
-            if blink_detector and 'ear_threshold' in settings:
-                blink_detector.set_calibrated_ear_threshold(float(settings['ear_threshold']))
+            if has_blink_detector and 'ear_threshold' in settings:
+                main.blink_detector.set_calibrated_ear_threshold(float(settings['ear_threshold']))
                 logger.info(f"Updated EAR threshold to {settings['ear_threshold']}")
             
             # Update keyboard UI settings if provided
-            if 'traversal_interval' in settings and hasattr(app, 'keyboard_ui') and app.keyboard_ui:
-                app.keyboard_ui.traversal_interval = float(settings['traversal_interval'])
+            if has_keyboard_ui and 'traversal_interval' in settings:
+                main.keyboard_ui.traversal_interval = float(settings['traversal_interval'])
                 logger.info(f"Updated traversal interval to {settings['traversal_interval']}")
             
             return jsonify({"status": "success"})
@@ -283,7 +316,7 @@ def handle_settings():
     
     else:  # GET
         # For web environment with no detectors initialized, return simulated settings
-        if is_web_env and (not blink_detector or not hasattr(app, 'keyboard_ui')):
+        if IS_WEB_ENV and (not has_blink_detector or not has_keyboard_ui):
             return jsonify({
                 "web_simulation": True,
                 "ear_threshold": 0.25,  # Default EAR threshold
@@ -294,17 +327,17 @@ def handle_settings():
         settings = {}
         
         # Get blink detector settings
-        if blink_detector:
+        if has_blink_detector:
             try:
-                settings['ear_threshold'] = getattr(blink_detector, 'calibrated_ear_threshold', 0.25)
+                settings['ear_threshold'] = getattr(main.blink_detector, 'calibrated_ear_threshold', 0.25)
             except Exception as e:
                 logger.warning(f"Error getting ear threshold: {str(e)}")
                 settings['ear_threshold'] = 0.25  # Default
         
         # Get keyboard UI settings
-        if hasattr(app, 'keyboard_ui') and app.keyboard_ui:
+        if has_keyboard_ui:
             try:
-                settings['traversal_interval'] = getattr(app.keyboard_ui, 'traversal_interval', 0.8)
+                settings['traversal_interval'] = getattr(main.keyboard_ui, 'traversal_interval', 0.8)
             except Exception as e:
                 logger.warning(f"Error getting traversal interval: {str(e)}")
                 settings['traversal_interval'] = 0.8  # Default

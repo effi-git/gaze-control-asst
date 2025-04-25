@@ -13,8 +13,8 @@ from collections import deque
 
 logger = logging.getLogger(__name__)
 
-# Check if we're in a web environment (Replit)
-IS_WEB_ENV = os.environ.get('REPL_ID') or not os.environ.get('DISPLAY')
+# Detect if we're in a web environment (Replit)
+IS_WEB_ENV = os.environ.get('REPL_ID') is not None or not os.environ.get('DISPLAY')
 
 class EyeTracker:
     """
@@ -522,7 +522,24 @@ class EyeTracker:
     def release(self):
         """Release the camera and clean up resources."""
         with self.lock:
-            if self.cap is not None:
-                self.cap.release()
+            if IS_WEB_ENV:
+                # In web environment, we don't have a real camera to release
                 self.cap = None
+                logger.info("Simulated camera resources released")
+            elif self.cap is not None:
+                # In desktop environment, properly release the camera
+                try:
+                    self.cap.release()
+                except Exception as e:
+                    logger.error(f"Error releasing camera: {str(e)}")
+                finally:
+                    self.cap = None
+                    
+            # Clean up MediaPipe resources
+            try:
+                if hasattr(self, 'face_mesh') and self.face_mesh:
+                    self.face_mesh.close()
+            except Exception as e:
+                logger.error(f"Error releasing MediaPipe resources: {str(e)}")
+                
             logger.info("Eye tracker resources released")
