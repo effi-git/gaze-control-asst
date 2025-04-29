@@ -26,10 +26,12 @@ A deep learning-based eye tracking system with LSTM blink detection, calibration
    ```
    git clone https://github.com/yourusername/eye-tracking-assistive-tech.git
    ```
-   
+
 Optional: Setup virtual environment 
+```
 python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+venv\Scripts\activate //activate - on windows 
+```
 
 2. Install the required packages:
    ```
