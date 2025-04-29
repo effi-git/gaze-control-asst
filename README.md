@@ -30,7 +30,7 @@ A deep learning-based eye tracking system with LSTM blink detection, calibration
 Optional: Setup virtual environment 
 ```
 python -m venv venv
-venv\Scripts\activate //activate - on windows 
+venv\Scripts\activate 
 ```
 
 2. Install the required packages:
