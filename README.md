@@ -20,15 +20,20 @@ A deep learning-based eye tracking system with LSTM blink detection, calibration
 
 ## Installation
 
+
+
 1. Clone this repository:
    ```
    git clone https://github.com/yourusername/eye-tracking-assistive-tech.git
-   cd eye-tracking-assistive-tech
    ```
+   
+Optional: Setup virtual environment 
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
 
 2. Install the required packages:
    ```
-   pip install flask flask-sqlalchemy gunicorn numpy opencv-python mediapipe tensorflow nltk pygame pyautogui
+   pip install -r requirements.txt
    ```
 
 3. Run the application:
