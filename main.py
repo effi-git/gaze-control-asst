@@ -168,6 +168,12 @@ def test_page():
     """Render the API test page."""
     return render_template('test_api.html')
 
+@app.route('/video_feed')
+def video_feed():
+    # Return a dummy or actual video feed for now
+    return "Video feed not implemented yet."
+
+
 @app.route('/api/start', methods=['POST'])
 def api_start():
     """API endpoint to start the eye tracking system."""

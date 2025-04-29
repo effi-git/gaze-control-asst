@@ -196,13 +196,11 @@ def get_status():
             "message": f"Error retrieving system status: {str(e)}",
             "running": False
         }), 500
-
+"""
 @app.route('/video_feed')
 def video_feed():
-    """
-    Video streaming route that works in both web and desktop environments.
-    Uses a static image in web environment to avoid worker timeouts.
-    """
+
+    
     from flask import send_file
     import io
     
@@ -291,7 +289,7 @@ def video_feed():
     else:
         # Only for desktop environments with real camera access
         def generate_frames():
-            """Generator function for streaming video frames."""
+
             frame_count = 0
             
             try:
@@ -325,6 +323,8 @@ def video_feed():
         except Exception as e:
             logger.error(f"Error returning video response: {str(e)}")
             return "Video streaming error", 500
+
+            """
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def handle_settings():
